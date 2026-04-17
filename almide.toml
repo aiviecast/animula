@@ -1,0 +1,4 @@
+[package]
+name = "aituber-poc"
+version = "0.1.0"
+description = "AI VTuber proof of concept — Almide application driving rendering, audio, network, and LLM/TTS through a monolithic native host."

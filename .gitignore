@@ -1,0 +1,3 @@
+.almide/
+build/
+*.wasm

@@ -1,0 +1,278 @@
+// aituber-poc — AI VTuber PoC entry point.
+//
+// Milestone 1 (this file): a programmatic head is rendered on the native
+// host, split across four meshes so later milestones (blink, lip sync)
+// can animate parts independently.
+//
+// Vertex format (44 bytes = 11 × f32, little-endian):
+//   pos.xyz  (12) | norm.xyz (12) | color.rgb (12) | uv.xy (8)
+
+// ── obsid.* @extern bindings ────────────────────────────────────────
+//
+// These mirror obsid's `src/mod.almd`. Once obsid is published as a git
+// dep we'll delete this block.
+
+@extern(wasm, "obsid", "create_mesh")
+fn create_mesh(id: Int) -> Unit
+
+@extern(wasm, "obsid", "upload_mesh")
+fn upload_mesh(id: Int, vert_ptr: Int, vert_count: Int, idx_ptr: Int, idx_count: Int) -> Unit
+
+@extern(wasm, "obsid", "set_mesh_position")
+fn set_mesh_position(id: Int, x: Float, y: Float, z: Float) -> Unit
+
+@extern(wasm, "obsid", "set_mesh_rotation")
+fn set_mesh_rotation(id: Int, x: Float, y: Float, z: Float) -> Unit
+
+@extern(wasm, "obsid", "set_mesh_scale")
+fn set_mesh_scale(id: Int, x: Float, y: Float, z: Float) -> Unit
+
+@extern(wasm, "obsid", "set_mesh_material")
+fn set_mesh_material(id: Int, shininess: Float, spec_r: Float, spec_g: Float, spec_b: Float) -> Unit
+
+@extern(wasm, "obsid", "set_camera")
+fn set_camera(fov: Float, aspect: Float, near: Float, far: Float, px: Float, py: Float, pz: Float, tx: Float, ty: Float, tz: Float) -> Unit
+
+@extern(wasm, "obsid", "get_aspect")
+fn get_aspect() -> Float
+
+@extern(wasm, "obsid", "set_dir_light")
+fn set_dir_light(r: Float, g: Float, b: Float, dx: Float, dy: Float, dz: Float) -> Unit
+
+@extern(wasm, "obsid", "set_ambient")
+fn set_ambient(r: Float, g: Float, b: Float) -> Unit
+
+@extern(wasm, "obsid", "set_fog")
+fn set_fog(r: Float, g: Float, b: Float, near: Float, far: Float) -> Unit
+
+@extern(wasm, "obsid", "set_point_light")
+fn set_point_light(idx: Int, x: Float, y: Float, z: Float, r: Float, g: Float, b: Float, range: Float) -> Unit
+
+@extern(wasm, "obsid", "render")
+fn render() -> Unit
+
+@extern(wasm, "obsid", "sin")
+fn sin(x: Float) -> Float
+@extern(wasm, "obsid", "cos")
+fn cos(x: Float) -> Float
+@extern(wasm, "obsid", "pi")
+fn pi() -> Float
+@extern(wasm, "obsid", "to_float")
+fn to_float(x: Int) -> Float
+
+@extern(wasm, "obsid", "set_state")
+fn set_state(slot: Int, value: Int) -> Unit
+@extern(wasm, "obsid", "get_state")
+fn get_state(slot: Int) -> Int
+@extern(wasm, "obsid", "set_state_f")
+fn set_state_f(slot: Int, value: Float) -> Unit
+@extern(wasm, "obsid", "get_state_f")
+fn get_state_f(slot: Int) -> Float
+
+// ── Mesh IDs ────────────────────────────────────────────────────────
+
+fn mesh_face() -> Int = 0
+fn mesh_eye_left() -> Int = 1
+fn mesh_eye_right() -> Int = 2
+fn mesh_mouth() -> Int = 3
+
+// ── State slots (orbit camera) ──────────────────────────────────────
+// float slots: 0=yaw, 1=pitch, 2=distance, 10=pointer_x, 11=pointer_y
+// int slots:   0=dragging (0/1)
+
+fn slot_yaw() -> Int = 0
+fn slot_pitch() -> Int = 1
+fn slot_distance() -> Int = 2
+fn slot_pointer_x() -> Int = 10
+fn slot_pointer_y() -> Int = 11
+fn slot_dragging() -> Int = 0
+
+// ── Sphere builder ───────────────────────────────────────────────────
+//
+// Each call creates and uploads a standalone mesh with its own vertex/
+// index buffers. `cx/cy/cz` offsets the sphere in local space (useful when
+// the mesh itself is positioned at origin and we want geometry offset
+// inside the mesh). Most callers pass 0.0 for all three and use
+// `set_mesh_position` on the parent mesh.
+
+effect fn upload_sphere(
+  id: Int,
+  segs: Int,
+  rings: Int,
+  radius: Float,
+  cx: Float, cy: Float, cz: Float,
+  cr: Float, cg: Float, cb: Float,
+) -> Unit = {
+  let vc = (rings + 1) * (segs + 1)
+  let ic = rings * segs * 6
+  let verts = bytes.new(vc * 44)
+  let idx = bytes.new(ic * 2)
+
+  for ring in 0..(rings + 1) {
+    for seg in 0..(segs + 1) {
+      let phi = pi() * to_float(ring) / to_float(rings)
+      let theta = 2.0 * pi() * to_float(seg) / to_float(segs)
+      let sp = sin(phi)
+      let nx = sp * cos(theta)
+      let ny = cos(phi)
+      let nz = sp * sin(theta)
+      let vi = ring * (segs + 1) + seg
+      let off = vi * 44
+      bytes.set_f32_le(verts, off + 0, cx + nx * radius)
+      bytes.set_f32_le(verts, off + 4, cy + ny * radius)
+      bytes.set_f32_le(verts, off + 8, cz + nz * radius)
+      bytes.set_f32_le(verts, off + 12, nx)
+      bytes.set_f32_le(verts, off + 16, ny)
+      bytes.set_f32_le(verts, off + 20, nz)
+      bytes.set_f32_le(verts, off + 24, cr)
+      bytes.set_f32_le(verts, off + 28, cg)
+      bytes.set_f32_le(verts, off + 32, cb)
+      bytes.set_f32_le(verts, off + 36, 0.0)
+      bytes.set_f32_le(verts, off + 40, 0.0)
+    }
+  }
+  for ring in 0..rings {
+    for seg in 0..segs {
+      let qi = ring * segs + seg
+      let o = qi * 12
+      let a = ring * (segs + 1) + seg
+      let b = a + segs + 1
+      bytes.set_u16_le(idx, o + 0, a)
+      bytes.set_u16_le(idx, o + 2, a + 1)
+      bytes.set_u16_le(idx, o + 4, b)
+      bytes.set_u16_le(idx, o + 6, a + 1)
+      bytes.set_u16_le(idx, o + 8, b + 1)
+      bytes.set_u16_le(idx, o + 10, b)
+    }
+  }
+
+  create_mesh(id)
+  upload_mesh(id, bytes.data_ptr(verts), vc, bytes.data_ptr(idx), ic)
+}
+
+// ── Orbit camera ────────────────────────────────────────────────────
+
+effect fn orbit_update(dx: Float, dy: Float) -> Unit = {
+  let yaw = get_state_f(slot_yaw()) - dx * 0.01
+  let raw = get_state_f(slot_pitch()) - dy * 0.01
+  let pitch = if raw < 0.0 - 1.5 then 0.0 - 1.5
+              else if raw > 1.5 then 1.5
+              else raw
+  set_state_f(slot_yaw(), yaw)
+  set_state_f(slot_pitch(), pitch)
+}
+
+effect fn orbit_zoom(delta: Float) -> Unit = {
+  let d = get_state_f(slot_distance())
+  let factor = if delta > 0.0 then 1.05 else 0.95
+  let new_d = d * factor
+  let clamped = if new_d < 2.0 then 2.0
+                else if new_d > 20.0 then 20.0
+                else new_d
+  set_state_f(slot_distance(), clamped)
+}
+
+// ── Event handlers ──────────────────────────────────────────────────
+
+effect fn on_pointer_down(x: Float, y: Float, button: Int) -> Unit = {
+  set_state(slot_dragging(), 1)
+  set_state_f(slot_pointer_x(), x)
+  set_state_f(slot_pointer_y(), y)
+}
+
+effect fn on_pointer_up(x: Float, y: Float, button: Int) -> Unit = {
+  set_state(slot_dragging(), 0)
+}
+
+effect fn on_pointer_move(x: Float, y: Float) -> Unit = {
+  if get_state(slot_dragging()) == 0 then () else {
+    let dx = x - get_state_f(slot_pointer_x())
+    let dy = y - get_state_f(slot_pointer_y())
+    set_state_f(slot_pointer_x(), x)
+    set_state_f(slot_pointer_y(), y)
+    orbit_update(dx, dy)
+  }
+}
+
+effect fn on_wheel(delta_y: Float) -> Unit = {
+  orbit_zoom(delta_y)
+}
+
+// ── Entry ───────────────────────────────────────────────────────────
+
+effect fn main() -> Unit = {
+  // Face: peach sphere at origin.
+  upload_sphere(mesh_face(), 40, 20, 1.0,
+                0.0, 0.0, 0.0,
+                0.95, 0.82, 0.72)
+  set_mesh_material(mesh_face(), 48.0, 0.4, 0.4, 0.5)
+
+  // Eyes: small near-black spheres. Positioned via set_mesh_position so
+  // later animation (blink = scale Y) stays simple.
+  upload_sphere(mesh_eye_left(), 20, 10, 0.15,
+                0.0, 0.0, 0.0,
+                0.12, 0.12, 0.14)
+  set_mesh_material(mesh_eye_left(), 64.0, 0.6, 0.6, 0.6)
+  set_mesh_position(mesh_eye_left(), 0.0 - 0.32, 0.15, 0.92)
+
+  upload_sphere(mesh_eye_right(), 20, 10, 0.15,
+                0.0, 0.0, 0.0,
+                0.12, 0.12, 0.14)
+  set_mesh_material(mesh_eye_right(), 64.0, 0.6, 0.6, 0.6)
+  set_mesh_position(mesh_eye_right(), 0.32, 0.15, 0.92)
+
+  // Mouth: red-brown ellipsoid. Y scale animates for lip sync later.
+  upload_sphere(mesh_mouth(), 24, 8, 0.14,
+                0.0, 0.0, 0.0,
+                0.92, 0.35, 0.12)
+  set_mesh_material(mesh_mouth(), 32.0, 0.3, 0.2, 0.2)
+  set_mesh_position(mesh_mouth(), 0.0, 0.0 - 0.32, 0.92)
+  set_mesh_scale(mesh_mouth(), 1.4, 0.5, 1.0)
+
+  // Initial orbit camera state.
+  set_state_f(slot_yaw(), 0.0)
+  set_state_f(slot_pitch(), 0.2)
+  set_state_f(slot_distance(), 5.0)
+  set_state(slot_dragging(), 0)
+}
+
+effect fn render_frame(time: Float) -> Unit = {
+  let yaw = get_state_f(slot_yaw())
+  let pitch = get_state_f(slot_pitch())
+  let dist = get_state_f(slot_distance())
+
+  let cp = cos(pitch)
+  let sp = sin(pitch)
+  let cy = cos(yaw)
+  let sy = sin(yaw)
+  let px = dist * cp * sy
+  let py = dist * sp
+  let pz = dist * cp * cy
+
+  set_camera(50.0, get_aspect(), 0.1, 100.0, px, py, pz, 0.0, 0.0, 0.0)
+
+  set_dir_light(0.8, 0.78, 0.7, 0.3, 0.7, 0.5)
+  set_ambient(0.18, 0.18, 0.22)
+  set_fog(0.08, 0.08, 0.12, 30.0, 80.0)
+
+  // Two colored rim lights, slowly orbiting to add life to the face.
+  let r = 2.5
+  set_point_light(0,
+    cos(time * 0.6) * r, 0.5, sin(time * 0.6) * r,
+    1.2, 0.4, 1.4, 5.0)
+  set_point_light(1,
+    cos(time * 0.4 + pi()) * r, 0.0 - 0.3, sin(time * 0.4 + pi()) * r,
+    0.4, 1.2, 1.4, 5.0)
+
+  // Subtle head sway so the character feels alive. Rotate all parts in
+  // lockstep — later milestones can animate parts independently (blink
+  // via eye Y scale, mouth via Y scale / morph).
+  let sway_y = sin(time * 0.7) * 0.15
+  let sway_z = sin(time * 1.3) * 0.05
+  set_mesh_rotation(mesh_face(), 0.0, sway_y, sway_z)
+  set_mesh_rotation(mesh_eye_left(), 0.0, sway_y, sway_z)
+  set_mesh_rotation(mesh_eye_right(), 0.0, sway_y, sway_z)
+  set_mesh_rotation(mesh_mouth(), 0.0, sway_y, sway_z)
+
+  render()
+}

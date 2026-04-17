@@ -1,0 +1,24 @@
+[package]
+name = "aituber-poc-host"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Native host for the aituber-poc Almide application — composes obsid rendering with audio/net/AI imports (incoming)."
+
+[[bin]]
+name = "aituber-poc"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+bytemuck = { version = "1", features = ["derive"] }
+pollster = "0.4"
+wasmtime = "29"
+wasmtime-wasi = "29"
+wgpu = "22"
+winit = "0.30"
+
+# Reused from the obsid repo's native host — lib interface exposes the
+# generic `register_obsid_imports` so we can compose additional namespaces
+# (audio, http, …) on the same linker.
+obsid-native = { path = "../../../almide/obsid/host/native" }
