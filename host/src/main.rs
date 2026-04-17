@@ -1,4 +1,4 @@
-//! aituber-poc native host.
+//! animula native host.
 //!
 //! Milestone 1: renderer only. As milestones add audio / http / ai, new
 //! fields land on `HostState` and their imports get registered through the
@@ -26,9 +26,9 @@ impl HostData for HostState {
 }
 
 fn main() -> Result<()> {
-    let (path, bytes) = obsid_native::load_wasm_from_args("aituber-poc")?;
+    let (path, bytes) = obsid_native::load_wasm_from_args("animula")?;
     let title = format!(
-        "aituber-poc — {}",
+        "animula — {}",
         path.file_name().and_then(|s| s.to_str()).unwrap_or("wasm")
     );
 

@@ -1,4 +1,4 @@
 [package]
-name = "aituber-poc"
+name = "animula"
 version = "0.1.0"
-description = "AI VTuber proof of concept — Almide application driving rendering, audio, network, and LLM/TTS through a monolithic native host."
+description = "AI VTuber framework — Almide application driving rendering, audio, network, and LLM/TTS through a monolithic native host. The little soul (animula, vagula, blandula) that inhabits the character."

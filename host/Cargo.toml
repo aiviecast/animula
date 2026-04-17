@@ -1,12 +1,12 @@
 [package]
-name = "aituber-poc-host"
+name = "animula-host"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "Native host for the aituber-poc Almide application — composes obsid rendering with audio/net/AI imports (incoming)."
+description = "Native host for the animula AI VTuber framework — composes obsid rendering with audio/net/AI imports."
 
 [[bin]]
-name = "aituber-poc"
+name = "animula"
 path = "src/main.rs"
 
 [dependencies]

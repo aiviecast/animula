@@ -41,20 +41,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aituber-poc-host"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytemuck",
- "obsid-native",
- "pollster",
- "wasmtime",
- "wasmtime-wasi",
- "wgpu",
- "winit",
-]
-
-[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -98,6 +84,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "animula-host"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "obsid-native",
+ "pollster",
+ "wasmtime",
+ "wasmtime-wasi",
+ "wgpu",
+ "winit",
 ]
 
 [[package]]
@@ -1067,12 +1067,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "glam"
-version = "0.29.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8babf46d4c1c9d92deac9f7be466f76dfc4482b6452fc5024b5e8daf6ffeb3ee"
-
-[[package]]
 name = "glow"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1982,7 +1976,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytemuck",
- "glam",
  "pollster",
  "wasmtime",
  "wasmtime-wasi",

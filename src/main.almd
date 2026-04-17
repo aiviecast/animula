@@ -1,4 +1,4 @@
-// aituber-poc — AI VTuber PoC entry point.
+// animula — AI VTuber framework entry point.
 //
 // Milestone 1 (this file): a programmatic head is rendered on the native
 // host, split across four meshes so later milestones (blink, lip sync)
