@@ -105,8 +105,8 @@ effect fn upload_sphere(
 ) -> Unit = {
   let vc = (rings + 1) * (segs + 1)
   let ic = rings * segs * 6
-  let verts = bytes.new(vc * 44)
-  let idx = bytes.new(ic * 2)
+  let verts = bytes.zeros(vc * 44)
+  let idx = bytes.zeros(ic * 2)
 
   for ring in 0..(rings + 1) {
     for seg in 0..(segs + 1) {
@@ -118,17 +118,17 @@ effect fn upload_sphere(
       let nz = sp * sin(theta)
       let vi = ring * (segs + 1) + seg
       let off = vi * 44
-      bytes.set_f32_le(verts, off + 0, cx + nx * radius)
-      bytes.set_f32_le(verts, off + 4, cy + ny * radius)
-      bytes.set_f32_le(verts, off + 8, cz + nz * radius)
-      bytes.set_f32_le(verts, off + 12, nx)
-      bytes.set_f32_le(verts, off + 16, ny)
-      bytes.set_f32_le(verts, off + 20, nz)
-      bytes.set_f32_le(verts, off + 24, cr)
-      bytes.set_f32_le(verts, off + 28, cg)
-      bytes.set_f32_le(verts, off + 32, cb)
-      bytes.set_f32_le(verts, off + 36, 0.0)
-      bytes.set_f32_le(verts, off + 40, 0.0)
+      bytes.put_f32_le(verts, off + 0, cx + nx * radius)
+      bytes.put_f32_le(verts, off + 4, cy + ny * radius)
+      bytes.put_f32_le(verts, off + 8, cz + nz * radius)
+      bytes.put_f32_le(verts, off + 12, nx)
+      bytes.put_f32_le(verts, off + 16, ny)
+      bytes.put_f32_le(verts, off + 20, nz)
+      bytes.put_f32_le(verts, off + 24, cr)
+      bytes.put_f32_le(verts, off + 28, cg)
+      bytes.put_f32_le(verts, off + 32, cb)
+      bytes.put_f32_le(verts, off + 36, 0.0)
+      bytes.put_f32_le(verts, off + 40, 0.0)
     }
   }
   for ring in 0..rings {
@@ -137,12 +137,12 @@ effect fn upload_sphere(
       let o = qi * 12
       let a = ring * (segs + 1) + seg
       let b = a + segs + 1
-      bytes.set_u16_le(idx, o + 0, a)
-      bytes.set_u16_le(idx, o + 2, a + 1)
-      bytes.set_u16_le(idx, o + 4, b)
-      bytes.set_u16_le(idx, o + 6, a + 1)
-      bytes.set_u16_le(idx, o + 8, b + 1)
-      bytes.set_u16_le(idx, o + 10, b)
+      bytes.put_u16_le(idx, o + 0, a)
+      bytes.put_u16_le(idx, o + 2, a + 1)
+      bytes.put_u16_le(idx, o + 4, b)
+      bytes.put_u16_le(idx, o + 6, a + 1)
+      bytes.put_u16_le(idx, o + 8, b + 1)
+      bytes.put_u16_le(idx, o + 10, b)
     }
   }
 
