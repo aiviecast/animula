@@ -108,8 +108,8 @@ effect fn upload_sphere(
   let verts = bytes.zeros(vc * 44)
   let idx = bytes.zeros(ic * 2)
 
-  for ring in 0..(rings + 1) {
-    for seg in 0..(segs + 1) {
+  for ring in 0..<(rings + 1) {
+    for seg in 0..<(segs + 1) {
       let phi = pi() * to_float(ring) / to_float(rings)
       let theta = 2.0 * pi() * to_float(seg) / to_float(segs)
       let sp = sin(phi)
@@ -131,8 +131,8 @@ effect fn upload_sphere(
       bytes.put_f32_le(verts, off + 40, 0.0)
     }
   }
-  for ring in 0..rings {
-    for seg in 0..segs {
+  for ring in 0..<rings {
+    for seg in 0..<segs {
       let qi = ring * segs + seg
       let o = qi * 12
       let a = ring * (segs + 1) + seg
