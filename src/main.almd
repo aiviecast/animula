@@ -7,6 +7,8 @@
 // Vertex format (44 bytes = 11 × f32, little-endian):
 //   pos.xyz  (12) | norm.xyz (12) | color.rgb (12) | uv.xy (8)
 
+import ffi
+
 // ── obsid.* @extern bindings ────────────────────────────────────────
 //
 // These mirror obsid's `src/mod.almd`. Once obsid is published as a git
@@ -147,7 +149,7 @@ effect fn upload_sphere(
   }
 
   create_mesh(id)
-  upload_mesh(id, bytes.data_ptr(verts), vc, bytes.data_ptr(idx), ic)
+  upload_mesh(id, ffi.to_int(ffi.address(verts)), vc, ffi.to_int(ffi.address(idx)), ic)
 }
 
 // ── Orbit camera ────────────────────────────────────────────────────
