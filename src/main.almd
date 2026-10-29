@@ -13,12 +13,15 @@ import ffi
 //
 // These mirror obsid's `src/mod.almd`. Once obsid is published as a git
 // dep we'll delete this block.
+//
+// Buffers cross as an `ffi.Region` (ADR-0031): the host receives its base and
+// the byte length the runtime holds, never a caller-typed length.
 
 @extern(wasm, "obsid", "create_mesh")
 fn create_mesh(id: Int) -> Unit
 
 @extern(wasm, "obsid", "upload_mesh")
-fn upload_mesh(id: Int, vert_ptr: Int, vert_count: Int, idx_ptr: Int, idx_count: Int) -> Unit
+fn upload_mesh(id: Int, verts: Region, vert_count: Int, indices: Region, idx_count: Int) -> Unit
 
 @extern(wasm, "obsid", "set_mesh_position")
 fn set_mesh_position(id: Int, x: Float, y: Float, z: Float) -> Unit
@@ -149,7 +152,7 @@ effect fn upload_sphere(
   }
 
   create_mesh(id)
-  upload_mesh(id, ffi.to_int(ffi.address(verts)), vc, ffi.to_int(ffi.address(idx)), ic)
+  upload_mesh(id, ffi.region(verts), vc, ffi.region(idx), ic)
 }
 
 // ── Orbit camera ────────────────────────────────────────────────────
