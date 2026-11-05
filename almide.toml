@@ -1,4 +1,4 @@
 [package]
 name = "animula"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI VTuber framework — Almide application driving rendering, audio, network, and LLM/TTS through a monolithic native host. The little soul (animula, vagula, blandula) that inhabits the character."

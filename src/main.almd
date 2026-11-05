@@ -7,16 +7,21 @@
 // Vertex format (44 bytes = 11 × f32, little-endian):
 //   pos.xyz  (12) | norm.xyz (12) | color.rgb (12) | uv.xy (8)
 
+import ffi
+
 // ── obsid.* @extern bindings ────────────────────────────────────────
 //
 // These mirror obsid's `src/mod.almd`. Once obsid is published as a git
 // dep we'll delete this block.
+//
+// Buffers cross as an `ffi.Region` (ADR-0031): the host receives its base and
+// the byte length the runtime holds, never a caller-typed length.
 
 @extern(wasm, "obsid", "create_mesh")
 fn create_mesh(id: Int) -> Unit
 
 @extern(wasm, "obsid", "upload_mesh")
-fn upload_mesh(id: Int, vert_ptr: Int, vert_count: Int, idx_ptr: Int, idx_count: Int) -> Unit
+fn upload_mesh(id: Int, verts: Region, vert_count: Int, indices: Region, idx_count: Int) -> Unit
 
 @extern(wasm, "obsid", "set_mesh_position")
 fn set_mesh_position(id: Int, x: Float, y: Float, z: Float) -> Unit
@@ -105,11 +110,11 @@ effect fn upload_sphere(
 ) -> Unit = {
   let vc = (rings + 1) * (segs + 1)
   let ic = rings * segs * 6
-  let verts = bytes.new(vc * 44)
-  let idx = bytes.new(ic * 2)
+  var verts = bytes.zeros(vc * 44)
+  var idx = bytes.zeros(ic * 2)
 
-  for ring in 0..(rings + 1) {
-    for seg in 0..(segs + 1) {
+  for ring in 0..<(rings + 1) {
+    for seg in 0..<(segs + 1) {
       let phi = pi() * to_float(ring) / to_float(rings)
       let theta = 2.0 * pi() * to_float(seg) / to_float(segs)
       let sp = sin(phi)
@@ -118,36 +123,36 @@ effect fn upload_sphere(
       let nz = sp * sin(theta)
       let vi = ring * (segs + 1) + seg
       let off = vi * 44
-      bytes.set_f32_le(verts, off + 0, cx + nx * radius)
-      bytes.set_f32_le(verts, off + 4, cy + ny * radius)
-      bytes.set_f32_le(verts, off + 8, cz + nz * radius)
-      bytes.set_f32_le(verts, off + 12, nx)
-      bytes.set_f32_le(verts, off + 16, ny)
-      bytes.set_f32_le(verts, off + 20, nz)
-      bytes.set_f32_le(verts, off + 24, cr)
-      bytes.set_f32_le(verts, off + 28, cg)
-      bytes.set_f32_le(verts, off + 32, cb)
-      bytes.set_f32_le(verts, off + 36, 0.0)
-      bytes.set_f32_le(verts, off + 40, 0.0)
+      bytes.put_f32_le(verts, off + 0, cx + nx * radius)
+      bytes.put_f32_le(verts, off + 4, cy + ny * radius)
+      bytes.put_f32_le(verts, off + 8, cz + nz * radius)
+      bytes.put_f32_le(verts, off + 12, nx)
+      bytes.put_f32_le(verts, off + 16, ny)
+      bytes.put_f32_le(verts, off + 20, nz)
+      bytes.put_f32_le(verts, off + 24, cr)
+      bytes.put_f32_le(verts, off + 28, cg)
+      bytes.put_f32_le(verts, off + 32, cb)
+      bytes.put_f32_le(verts, off + 36, 0.0)
+      bytes.put_f32_le(verts, off + 40, 0.0)
     }
   }
-  for ring in 0..rings {
-    for seg in 0..segs {
+  for ring in 0..<rings {
+    for seg in 0..<segs {
       let qi = ring * segs + seg
       let o = qi * 12
       let a = ring * (segs + 1) + seg
       let b = a + segs + 1
-      bytes.set_u16_le(idx, o + 0, a)
-      bytes.set_u16_le(idx, o + 2, a + 1)
-      bytes.set_u16_le(idx, o + 4, b)
-      bytes.set_u16_le(idx, o + 6, a + 1)
-      bytes.set_u16_le(idx, o + 8, b + 1)
-      bytes.set_u16_le(idx, o + 10, b)
+      bytes.put_u16_le(idx, o + 0, a)
+      bytes.put_u16_le(idx, o + 2, a + 1)
+      bytes.put_u16_le(idx, o + 4, b)
+      bytes.put_u16_le(idx, o + 6, a + 1)
+      bytes.put_u16_le(idx, o + 8, b + 1)
+      bytes.put_u16_le(idx, o + 10, b)
     }
   }
 
   create_mesh(id)
-  upload_mesh(id, bytes.data_ptr(verts), vc, bytes.data_ptr(idx), ic)
+  upload_mesh(id, ffi.region(verts), vc, ffi.region(idx), ic)
 }
 
 // ── Orbit camera ────────────────────────────────────────────────────
@@ -190,12 +195,12 @@ effect fn on_pointer_move(x: Float, y: Float) -> Unit = {
     let dy = y - get_state_f(slot_pointer_y())
     set_state_f(slot_pointer_x(), x)
     set_state_f(slot_pointer_y(), y)
-    orbit_update(dx, dy)
+    orbit_update(dx, dy)!
   }
 }
 
 effect fn on_wheel(delta_y: Float) -> Unit = {
-  orbit_zoom(delta_y)
+  orbit_zoom(delta_y)!
 }
 
 // ── Entry ───────────────────────────────────────────────────────────
@@ -204,27 +209,27 @@ effect fn main() -> Unit = {
   // Face: peach sphere at origin.
   upload_sphere(mesh_face(), 40, 20, 1.0,
                 0.0, 0.0, 0.0,
-                0.95, 0.82, 0.72)
+                0.95, 0.82, 0.72)!
   set_mesh_material(mesh_face(), 48.0, 0.4, 0.4, 0.5)
 
   // Eyes: small near-black spheres. Positioned via set_mesh_position so
   // later animation (blink = scale Y) stays simple.
   upload_sphere(mesh_eye_left(), 20, 10, 0.15,
                 0.0, 0.0, 0.0,
-                0.12, 0.12, 0.14)
+                0.12, 0.12, 0.14)!
   set_mesh_material(mesh_eye_left(), 64.0, 0.6, 0.6, 0.6)
   set_mesh_position(mesh_eye_left(), 0.0 - 0.32, 0.15, 0.92)
 
   upload_sphere(mesh_eye_right(), 20, 10, 0.15,
                 0.0, 0.0, 0.0,
-                0.12, 0.12, 0.14)
+                0.12, 0.12, 0.14)!
   set_mesh_material(mesh_eye_right(), 64.0, 0.6, 0.6, 0.6)
   set_mesh_position(mesh_eye_right(), 0.32, 0.15, 0.92)
 
   // Mouth: red-brown ellipsoid. Y scale animates for lip sync later.
   upload_sphere(mesh_mouth(), 24, 8, 0.14,
                 0.0, 0.0, 0.0,
-                0.92, 0.35, 0.12)
+                0.92, 0.35, 0.12)!
   set_mesh_material(mesh_mouth(), 32.0, 0.3, 0.2, 0.2)
   set_mesh_position(mesh_mouth(), 0.0, 0.0 - 0.32, 0.92)
   set_mesh_scale(mesh_mouth(), 1.4, 0.5, 1.0)
